@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
+import json
 import torch
 import argparse
 import imageio.v3 as iio
@@ -38,13 +39,33 @@ if __name__ == "__main__":
         help="Compute dense and grid tracks starting from this frame",
     )
 
+    # New argument to specify the path to the queries JSON file
+    parser.add_argument(
+        "--queries_path",
+        type=str,
+        default=None,
+        help="Path to a JSON file containing the queries (frame number, x, y coordinates)",
+    )
+
     args = parser.parse_args()
 
     if not os.path.isfile(args.video_path):
         raise ValueError("Video file does not exist")
 
+    # Load queries from the JSON file if provided
+    if args.queries_path:
+        with open(args.queries_path, "r") as f:
+            queries_data = json.load(f)
+
+        # Convert queries into a tensor (assuming JSON structure is a list of lists)
+        queries = torch.tensor(queries_data)
+    else:
+        queries = None
+
+    print("Loaded queries:", queries)
+
     if args.checkpoint is not None:
-        model = CoTrackerOnlinePredictor(checkpoint=args.checkpoint)
+        model = CoTrackerOnlinePredictor(checkpoint=args.checkpoint, queries=queries)
     else:
         model = torch.hub.load("facebookresearch/co-tracker", "cotracker3_online")
     model = model.to(DEFAULT_DEVICE)
@@ -90,7 +111,7 @@ if __name__ == "__main__":
         grid_size=args.grid_size,
         grid_query_frame=args.grid_query_frame,
     )
-
+    print("Tracks", pred_tracks)
     print("Tracks are computed")
 
     # save a video with predicted tracks
